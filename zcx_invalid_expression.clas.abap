@@ -1,0 +1,34 @@
+class ZCX_INVALID_EXPRESSION definition
+  public
+  inheriting from CX_STATIC_CHECK
+  create public .
+
+public section.
+
+  constants ZCX_INVALID_EXPRESSION type SOTR_CONC value '001D4FFC4B1E1EE6BD99473FC1454AEB' ##NO_TEXT.
+  constants INVALID_OPERATION type SOTR_CONC value '001D4FFC4B1E1EE6BD99473FC1456AEB' ##NO_TEXT.
+
+  methods CONSTRUCTOR
+    importing
+      !TEXTID like TEXTID optional
+      !PREVIOUS like PREVIOUS optional .
+protected section.
+private section.
+ENDCLASS.
+
+
+
+CLASS ZCX_INVALID_EXPRESSION IMPLEMENTATION.
+
+
+  method CONSTRUCTOR.
+CALL METHOD SUPER->CONSTRUCTOR
+EXPORTING
+TEXTID = TEXTID
+PREVIOUS = PREVIOUS
+.
+ IF textid IS INITIAL.
+   me->textid = ZCX_INVALID_EXPRESSION .
+ ENDIF.
+  endmethod.
+ENDCLASS.
