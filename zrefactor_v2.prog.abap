@@ -19,6 +19,8 @@ CLASS product DEFINITION.
 
     METHODS get RETURNING VALUE(re_product) TYPE zproducts.
 
+    METHODS get_value RETURNING VALUE(re_value) TYPE zcalc_result.
+
   PRIVATE SECTION.
     DATA: product TYPE zproducts.
 
@@ -36,6 +38,32 @@ CLASS product IMPLEMENTATION.
 
   METHOD get.
     re_product = me->product.
+  ENDMETHOD.
+
+  METHOD get_value.
+    re_value = me->product-unit_price * me->product-quantity.
+  ENDMETHOD.
+ENDCLASS.
+
+CLASS test_product DEFINITION FOR TESTING RISK LEVEL HARMLESS.
+
+  PRIVATE SECTION.
+    DATA test_product TYPE REF TO product.
+    METHODS product_total FOR TESTING.
+
+ENDCLASS.
+
+CLASS test_product IMPLEMENTATION.
+  METHOD product_total.
+    DATA product_data TYPE zproducts.
+    product_data-id = '025'.
+    product_data-description = 'Cellphone 3000'.
+    product_data-quantity = 3.
+    product_data-unit_price = 1400.
+
+    CREATE OBJECT me->test_product EXPORTING imc_product = product_data.
+    DATA(product_value) = me->test_product->get_value( ).
+    cl_abap_unit_assert=>assert_equals( act = product_value exp = 4200 ).
   ENDMETHOD.
 ENDCLASS.
 
@@ -67,8 +95,8 @@ CLASS purchase_order IMPLEMENTATION.
     DATA: r_product  TYPE REF TO product,
           wa_product TYPE zproducts,
           vg_total   TYPE zproducts-unit_price.
-
     LOOP AT items_list INTO r_product.
+
       wa_product = r_product->get( ).
       vg_total = wa_product-unit_price * wa_product-quantity.
       ADD vg_total TO re_total.
@@ -83,6 +111,59 @@ CLASS purchase_order IMPLEMENTATION.
     me->display_generator = generator_obj.
   ENDMETHOD.
 
+ENDCLASS.
+
+CLASS test_purchase_order DEFINITION FOR TESTING RISK LEVEL HARMLESS.
+  PRIVATE SECTION.
+    DATA test_purchase_order TYPE REF TO purchase_order.
+    METHODS setup.
+    METHODS return_total_po FOR TESTING.
+ENDCLASS.
+
+CLASS test_purchase_order IMPLEMENTATION.
+  METHOD setup.
+    CREATE OBJECT me->test_purchase_order.
+  ENDMETHOD.
+
+  METHOD return_total_po.
+
+    DATA product_data TYPE zproducts.
+    DATA test_product TYPE REF TO product.
+
+    product_data-id = '025'.
+    product_data-description = 'Cellphone 3000'.
+    product_data-quantity = 3.
+    product_data-unit_price = 1400.
+
+    CREATE OBJECT test_product
+      EXPORTING
+        imc_product = product_data.
+    me->test_purchase_order->add_item( test_product ).
+
+    product_data-id = '984'.
+    product_data-description = 'TV 40pol'.
+    product_data-quantity = 6.
+    product_data-unit_price = 3400.
+
+    CREATE OBJECT test_product
+      EXPORTING
+        imc_product = product_data.
+    me->test_purchase_order->add_item( test_product ).
+
+    product_data-id = '758'.
+    product_data-description = 'Audio System 439'.
+    product_data-quantity = 2.
+    product_data-unit_price = 7800.
+
+    CREATE OBJECT test_product
+      EXPORTING
+        imc_product = product_data.
+    me->test_purchase_order->add_item( test_product ).
+
+    DATA(po_total) = me->test_purchase_order->get_po_total( ).
+    cl_abap_unit_assert=>assert_equals( act = po_total exp = 40200 ).
+
+  ENDMETHOD.
 ENDCLASS.
 
 INTERFACE output_generator.
@@ -156,8 +237,8 @@ START-OF-SELECTION.
   CREATE OBJECT r_product
     EXPORTING
       imc_product = wa_product.
-  r_pur_ord->add_item( r_product ).
 
+  r_pur_ord->add_item( r_product ).
   wa_product-id = '984'.
   wa_product-description = 'TV 40pol'.
   wa_product-quantity = 6.
