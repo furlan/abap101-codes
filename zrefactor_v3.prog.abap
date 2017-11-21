@@ -5,6 +5,13 @@
 *&---------------------------------------------------------------------*
 REPORT zrefactor_v3 LINE-SIZE 90.
 
+TYPES: BEGIN OF lty_product,
+         id          TYPE c LENGTH 5,
+         description TYPE c LENGTH 30,
+         quantity    TYPE n LENGTH 3,
+         unit_price  TYPE p LENGTH 5 DECIMALS 2,
+       END OF lty_product.
+
 INTERFACE output_generator DEFERRED.
 CLASS product DEFINITION DEFERRED.
 
@@ -13,16 +20,16 @@ TYPES items_table TYPE TABLE OF REF TO product.
 CLASS product DEFINITION.
 
   PUBLIC SECTION.
-    METHODS constructor IMPORTING imc_product TYPE zproducts.
+    METHODS constructor IMPORTING imc_product TYPE lty_product.
 
-    METHODS set IMPORTING im_product TYPE zproducts.
+    METHODS set IMPORTING im_product TYPE lty_product.
 
-    METHODS get RETURNING VALUE(re_product) TYPE zproducts.
+    METHODS get RETURNING VALUE(re_product) TYPE lty_product.
 
     METHODS get_value RETURNING VALUE(re_value) TYPE zcalc_result.
 
   PRIVATE SECTION.
-    DATA: product TYPE zproducts.
+    DATA: product TYPE lty_product.
 
 ENDCLASS.
 
@@ -55,7 +62,7 @@ ENDCLASS.
 
 CLASS test_product IMPLEMENTATION.
   METHOD product_total.
-    DATA product_data TYPE zproducts.
+    DATA product_data TYPE lty_product.
     product_data-id = '025'.
     product_data-description = 'Cellphone 3000'.
     product_data-quantity = 3.
@@ -71,15 +78,18 @@ ENDCLASS.
 CLASS purchase_order DEFINITION.
 
   PUBLIC SECTION.
-    METHODS add_item IMPORTING im_item TYPE REF TO product.
+    METHODS get_po_number RETURNING VALUE(po_number) TYPE i.
+    METHODS add_item IMPORTING im_item TYPE REF TO product
+                     RAISING   zcx_price_zeroless.
 
-    METHODS get_po_total RETURNING VALUE(re_total) TYPE zproducts-unit_price.
+    METHODS get_po_total RETURNING VALUE(re_total) TYPE lty_product-unit_price.
 
     METHODS get_items EXPORTING items_list TYPE items_table.
 
     METHODS link_display_generator IMPORTING generator_obj TYPE REF TO output_generator.
 
   PRIVATE SECTION.
+    DATA po_number TYPE i.
     DATA items_list TYPE items_table.
     DATA display_generator TYPE REF TO output_generator.
 
@@ -87,16 +97,24 @@ ENDCLASS.
 
 CLASS purchase_order IMPLEMENTATION.
 
+  METHOD get_po_number.
+    po_number = me->po_number.
+  ENDMETHOD.
+
   METHOD add_item.
-    APPEND im_item TO items_list.
+    DATA(product_data) = im_item->get( ).
+    IF product_data-unit_price GT 0.
+      APPEND im_item TO items_list.
+    ELSE.
+      RAISE EXCEPTION TYPE zcx_price_zeroless.
+    ENDIF.
   ENDMETHOD.
 
   METHOD get_po_total.
     DATA: r_product  TYPE REF TO product,
-          wa_product TYPE zproducts,
-          vg_total   TYPE zproducts-unit_price.
+          wa_product TYPE lty_product,
+          vg_total   TYPE lty_product-unit_price.
     LOOP AT items_list INTO r_product.
-
       wa_product = r_product->get( ).
       vg_total = wa_product-unit_price * wa_product-quantity.
       ADD vg_total TO re_total.
@@ -118,6 +136,7 @@ CLASS test_purchase_order DEFINITION FOR TESTING RISK LEVEL HARMLESS.
     DATA test_purchase_order TYPE REF TO purchase_order.
     METHODS setup.
     METHODS return_total_po FOR TESTING.
+    METHODS should_not_have_price_zeroless FOR TESTING.
 ENDCLASS.
 
 CLASS test_purchase_order IMPLEMENTATION.
@@ -127,7 +146,7 @@ CLASS test_purchase_order IMPLEMENTATION.
 
   METHOD return_total_po.
 
-    DATA product_data TYPE zproducts.
+    DATA product_data TYPE lty_product.
     DATA test_product TYPE REF TO product.
 
     product_data-id = '025'.
@@ -164,6 +183,43 @@ CLASS test_purchase_order IMPLEMENTATION.
     cl_abap_unit_assert=>assert_equals( act = po_total exp = 40200 ).
 
   ENDMETHOD.
+
+  METHOD should_not_have_price_zeroless.
+    DATA product_data TYPE lty_product.
+    DATA test_product TYPE REF TO product.
+    DATA test_exception TYPE REF TO cx_static_check.
+
+    product_data-id = '025'.
+    product_data-description = 'Cellphone 3000'.
+    product_data-quantity = 3.
+    product_data-unit_price = 0.
+
+    CREATE OBJECT test_product
+      EXPORTING
+        imc_product = product_data.
+    TRY.
+        me->test_purchase_order->add_item( test_product ).
+      CATCH zcx_price_zeroless INTO test_exception.
+    ENDTRY.
+
+    cl_abap_unit_assert=>assert_bound( act = test_exception ).
+
+  ENDMETHOD.
+ENDCLASS.
+
+INTERFACE data_loader.
+  METHODS load_data IMPORTING load_po TYPE REF TO purchase_order.
+ENDINTERFACE.
+
+CLASS products_loader_db DEFINITION.
+  PUBLIC SECTION.
+    INTERFACES data_loader.
+ENDCLASS.
+
+CLASS products_loader_db IMPLEMENTATION.
+  METHOD data_loader~load_data.
+
+  ENDMETHOD.
 ENDCLASS.
 
 INTERFACE output_generator.
@@ -180,9 +236,9 @@ ENDCLASS.
 CLASS report_list IMPLEMENTATION.
   METHOD output_generator~generate.
     DATA: r_product  TYPE REF TO product,
-          wa_product TYPE zproducts,
-          vg_total   TYPE zproducts-unit_price,
-          vg_total_p TYPE zproducts-unit_price.
+          wa_product TYPE lty_product,
+          vg_total   TYPE lty_product-unit_price,
+          vg_total_p TYPE lty_product-unit_price.
 
     DATA items_list TYPE items_table.
 
@@ -223,7 +279,7 @@ ENDCLASS.
 
 DATA: r_product  TYPE REF TO product,
       r_pur_ord  TYPE REF TO purchase_order,
-      wa_product TYPE zproducts.
+      wa_product TYPE lty_product.
 
 START-OF-SELECTION.
 

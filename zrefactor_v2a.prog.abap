@@ -1,9 +1,9 @@
 *&---------------------------------------------------------------------*
-*& Report zrefactor_v2
+*& Report zrefactor_v2a
 *&---------------------------------------------------------------------*
 *&
 *&---------------------------------------------------------------------*
-REPORT zrefactor_v2 LINE-SIZE 90.
+REPORT zrefactor_v2a LINE-SIZE 90.
 
 TYPES: BEGIN OF lty_product,
          id          TYPE c LENGTH 5,
@@ -78,7 +78,8 @@ ENDCLASS.
 CLASS purchase_order DEFINITION.
 
   PUBLIC SECTION.
-    METHODS add_item IMPORTING im_item TYPE REF TO product.
+    METHODS add_item IMPORTING im_item TYPE REF TO product
+                     RAISING zcx_price_zeroless.
 
     METHODS get_po_total RETURNING VALUE(re_total) TYPE lty_product-unit_price.
 
@@ -95,7 +96,12 @@ ENDCLASS.
 CLASS purchase_order IMPLEMENTATION.
 
   METHOD add_item.
-    APPEND im_item TO items_list.
+    DATA(product_data) = im_item->get( ).
+    IF product_data-unit_price GT 0.
+      APPEND im_item TO items_list.
+    ELSE.
+      RAISE EXCEPTION TYPE zcx_price_zeroless.
+    ENDIF.
   ENDMETHOD.
 
   METHOD get_po_total.
@@ -103,7 +109,6 @@ CLASS purchase_order IMPLEMENTATION.
           wa_product TYPE lty_product,
           vg_total   TYPE lty_product-unit_price.
     LOOP AT items_list INTO r_product.
-
       wa_product = r_product->get( ).
       vg_total = wa_product-unit_price * wa_product-quantity.
       ADD vg_total TO re_total.
@@ -125,6 +130,7 @@ CLASS test_purchase_order DEFINITION FOR TESTING RISK LEVEL HARMLESS.
     DATA test_purchase_order TYPE REF TO purchase_order.
     METHODS setup.
     METHODS return_total_po FOR TESTING.
+    METHODS should_not_have_price_zeroless FOR TESTING.
 ENDCLASS.
 
 CLASS test_purchase_order IMPLEMENTATION.
@@ -169,6 +175,28 @@ CLASS test_purchase_order IMPLEMENTATION.
 
     DATA(po_total) = me->test_purchase_order->get_po_total( ).
     cl_abap_unit_assert=>assert_equals( act = po_total exp = 40200 ).
+
+  ENDMETHOD.
+
+  METHOD should_not_have_price_zeroless.
+    DATA product_data TYPE lty_product.
+    DATA test_product TYPE REF TO product.
+    DATA test_exception TYPE REF TO cx_static_check.
+
+    product_data-id = '025'.
+    product_data-description = 'Cellphone 3000'.
+    product_data-quantity = 3.
+    product_data-unit_price = 0.
+
+    CREATE OBJECT test_product
+      EXPORTING
+        imc_product = product_data.
+    TRY.
+        me->test_purchase_order->add_item( test_product ).
+      CATCH zcx_price_zeroless INTO test_exception.
+    ENDTRY.
+
+    cl_abap_unit_assert=>assert_bound( act = test_exception ).
 
   ENDMETHOD.
 ENDCLASS.
