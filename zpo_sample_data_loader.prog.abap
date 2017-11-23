@@ -147,3 +147,5 @@ START-OF-SELECTION.
   INSERT zpoitems FROM TABLE po_list.
 
   COMMIT WORK.
+
+  WRITE 'Data load completed!'.

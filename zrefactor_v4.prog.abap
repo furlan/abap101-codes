@@ -1,9 +1,9 @@
 *&---------------------------------------------------------------------*
-*& Report zrefactor_v3
+*& Report zrefactor_v4
 *&---------------------------------------------------------------------*
 *&
 *&---------------------------------------------------------------------*
-REPORT zrefactor_v3 LINE-SIZE 90.
+REPORT zrefactor_v4 LINE-SIZE 90.
 
 TYPES: BEGIN OF lty_product,
          id          TYPE c LENGTH 5,
