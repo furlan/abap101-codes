@@ -105,7 +105,7 @@ START-OF-SELECTION.
   CLEAR po_data.
   po_data-ponum = poh_data-ponum.
   po_data-poline = 3.
-  po_data-product_id = '778'.
+  po_data-product_id = '758'.
   po_data-quantity = 2.
   po_data-uom = 'UN'.
   po_data-unit_price = 5355.

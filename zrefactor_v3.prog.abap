@@ -78,7 +78,8 @@ ENDCLASS.
 CLASS purchase_order DEFINITION.
 
   PUBLIC SECTION.
-    METHODS get_po_number RETURNING VALUE(po_number) TYPE i.
+    METHODS constructor IMPORTING ponum TYPE zpoheader-ponum.
+    METHODS get_po_number RETURNING VALUE(po_number) TYPE zpoheader-ponum.
     METHODS add_item IMPORTING im_item TYPE REF TO product
                      RAISING   zcx_price_zeroless.
 
@@ -86,16 +87,18 @@ CLASS purchase_order DEFINITION.
 
     METHODS get_items EXPORTING items_list TYPE items_table.
 
-    METHODS link_display_generator IMPORTING generator_obj TYPE REF TO output_generator.
-
   PRIVATE SECTION.
-    DATA po_number TYPE i.
+    DATA po_number TYPE zpoheader-ponum.
     DATA items_list TYPE items_table.
     DATA display_generator TYPE REF TO output_generator.
 
 ENDCLASS.
 
 CLASS purchase_order IMPLEMENTATION.
+
+  METHOD constructor.
+    po_number = ponum.
+  ENDMETHOD.
 
   METHOD get_po_number.
     po_number = me->po_number.
@@ -125,10 +128,6 @@ CLASS purchase_order IMPLEMENTATION.
     items_list = me->items_list.
   ENDMETHOD.
 
-  METHOD link_display_generator.
-    me->display_generator = generator_obj.
-  ENDMETHOD.
-
 ENDCLASS.
 
 CLASS test_purchase_order DEFINITION FOR TESTING RISK LEVEL HARMLESS.
@@ -141,7 +140,7 @@ ENDCLASS.
 
 CLASS test_purchase_order IMPLEMENTATION.
   METHOD setup.
-    CREATE OBJECT me->test_purchase_order.
+    CREATE OBJECT me->test_purchase_order EXPORTING ponum = '00000'.
   ENDMETHOD.
 
   METHOD return_total_po.
@@ -208,7 +207,9 @@ CLASS test_purchase_order IMPLEMENTATION.
 ENDCLASS.
 
 INTERFACE data_loader.
-  METHODS load_data IMPORTING load_po TYPE REF TO purchase_order.
+  METHODS load_data IMPORTING load_po TYPE REF TO purchase_order
+                    RAISING   zcx_po_not_exists.
+  "methods addProduct IMPORTING add_product type REF TO product.
 ENDINTERFACE.
 
 CLASS products_loader_db DEFINITION.
@@ -218,6 +219,42 @@ ENDCLASS.
 
 CLASS products_loader_db IMPLEMENTATION.
   METHOD data_loader~load_data.
+    DATA poheader TYPE zpoheader.
+    DATA poitems TYPE TABLE OF zpoitems.
+
+    FIELD-SYMBOLS <poitem> TYPE zpoitems.
+
+    DATA(po_number) = load_po->get_po_number( ).
+
+    SELECT SINGLE * FROM zpoheader INTO poheader WHERE ponum = po_number.
+    IF sy-subrc NE 0.
+      RAISE EXCEPTION TYPE zcx_po_not_exists.
+    ENDIF.
+
+    SELECT * FROM zpoitems INTO TABLE poitems WHERE ponum = po_number.
+    IF sy-subrc NE 0.
+      RAISE EXCEPTION TYPE zcx_po_not_exists.
+    ENDIF.
+
+    LOOP AT poitems ASSIGNING <poitem>.
+
+      DATA product_data TYPE lty_product.
+      DATA add_product TYPE REF TO product.
+
+      product_data-id = <poitem>-product_id.
+      SELECT SINGLE description FROM zproducts
+              INTO product_data-description
+              WHERE id = <poitem>-product_id.
+      product_data-quantity = <poitem>-quantity.
+      product_data-unit_price = <poitem>-unit_price.
+
+      CREATE OBJECT add_product
+        EXPORTING
+          imc_product = product_data.
+      load_po->add_item( add_product ).
+      clear product_data.
+
+    ENDLOOP.
 
   ENDMETHOD.
 ENDCLASS.
@@ -283,37 +320,16 @@ DATA: r_product  TYPE REF TO product,
 
 START-OF-SELECTION.
 
-  CREATE OBJECT r_pur_ord.
+  CREATE OBJECT r_pur_ord EXPORTING ponum = '00001'.
 
-  wa_product-id = '025'.
-  wa_product-description = 'Cellphone 3000'.
-  wa_product-quantity = 3.
-  wa_product-unit_price = 1400.
+  DATA db_po_loader TYPE REF TO data_loader.
+  db_po_loader = NEW products_loader_db(  ).
 
-  CREATE OBJECT r_product
-    EXPORTING
-      imc_product = wa_product.
-
-  r_pur_ord->add_item( r_product ).
-  wa_product-id = '984'.
-  wa_product-description = 'TV 40pol'.
-  wa_product-quantity = 6.
-  wa_product-unit_price = 3400.
-
-  CREATE OBJECT r_product
-    EXPORTING
-      imc_product = wa_product.
-  r_pur_ord->add_item( r_product ).
-
-  wa_product-id = '758'.
-  wa_product-description = 'Audio System 439'.
-  wa_product-quantity = 2.
-  wa_product-unit_price = 7800.
-
-  CREATE OBJECT r_product
-    EXPORTING
-      imc_product = wa_product.
-  r_pur_ord->add_item( r_product ).
+  TRY.
+      db_po_loader->load_data( r_pur_ord ).
+    CATCH zcx_po_not_exists.
+      MESSAGE 'PO does not exist.' TYPE 'E'.
+  ENDTRY.
 
   DATA out_display TYPE REF TO output_generator.
   out_display = NEW report_list( ) .
