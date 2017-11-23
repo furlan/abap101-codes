@@ -251,7 +251,7 @@ CLASS products_loader_db IMPLEMENTATION.
         EXPORTING
           imc_product = product_data.
       load_po->add_item( add_product ).
-      clear product_data.
+      CLEAR product_data.
 
     ENDLOOP.
 
@@ -262,11 +262,52 @@ INTERFACE output_generator.
   METHODS generate IMPORTING po_object TYPE REF TO purchase_order.
 ENDINTERFACE.
 
-CLASS report_list DEFINITION.
-
+CLASS report_alv DEFINITION.
   PUBLIC SECTION.
     INTERFACES output_generator.
+ENDCLASS.
 
+CLASS report_alv IMPLEMENTATION.
+  METHOD output_generator~generate.
+
+    TYPES: BEGIN OF output_alv,
+             id          TYPE c LENGTH 5,
+             description TYPE c LENGTH 30,
+             quantity    TYPE n LENGTH 3,
+             unit_price  TYPE p LENGTH 5 DECIMALS 2,
+             item_value  TYPE p LENGTH 5 DECIMALS 2,
+           END OF output_alv.
+
+    DATA alv_grid    TYPE REF TO cl_salv_table.
+    DATA output_tab  TYPE TABLE OF output_alv.
+    DATA output_item TYPE output_alv.
+
+    DATA items_list TYPE items_table.
+    po_object->get_items( IMPORTING items_list = items_list ).
+
+    LOOP AT items_list INTO DATA(r_product).
+      DATA(product_data) = r_product->get( ).
+      output_item = product_data.
+      output_item-item_value = r_product->get_value( ).
+      APPEND output_item TO output_tab.
+    ENDLOOP.
+
+    cl_salv_table=>factory(
+        IMPORTING
+            r_salv_table = alv_grid
+        CHANGING
+            t_table = output_tab
+    ).
+
+    alv_grid->display( ).
+
+  ENDMETHOD.
+ENDCLASS.
+
+
+CLASS report_list DEFINITION.
+  PUBLIC SECTION.
+    INTERFACES output_generator.
 ENDCLASS.
 
 CLASS report_list IMPLEMENTATION.
@@ -328,5 +369,9 @@ START-OF-SELECTION.
   ENDTRY.
 
   DATA out_display TYPE REF TO output_generator.
-  out_display = NEW report_list( ) .
+  "out_display = NEW report_list( ) .
+  out_display = NEW report_alv( ) .
   out_display->generate( r_pur_ord ).
+
+
+* eof
