@@ -125,6 +125,7 @@ CLASS test_purchase_order DEFINITION FOR TESTING RISK LEVEL HARMLESS.
     DATA test_purchase_order TYPE REF TO purchase_order.
     METHODS setup.
     METHODS return_total_po FOR TESTING.
+    METHODS should_not_have_price_zeroless FOR TESTING.
 ENDCLASS.
 
 CLASS test_purchase_order IMPLEMENTATION.
@@ -169,6 +170,26 @@ CLASS test_purchase_order IMPLEMENTATION.
 
     DATA(po_total) = me->test_purchase_order->get_po_total( ).
     cl_abap_unit_assert=>assert_equals( act = po_total exp = 40200 ).
+
+  ENDMETHOD.
+
+  METHOD should_not_have_price_zeroless.
+    DATA product_data TYPE lty_product.
+    DATA test_product TYPE REF TO product.
+    DATA test_exception TYPE REF TO cx_static_check.
+
+    product_data-id = '025'.
+    product_data-description = 'Cellphone 3000'.
+    product_data-quantity = 3.
+    product_data-unit_price = 0.
+
+    CREATE OBJECT test_product
+      EXPORTING
+        imc_product = product_data.
+    me->test_purchase_order->add_item( test_product ).
+
+    DATA(po_total) = me->test_purchase_order->get_po_total( ).
+    cl_abap_unit_assert=>assert_equals( act = po_total exp = 0 ).
 
   ENDMETHOD.
 ENDCLASS.
