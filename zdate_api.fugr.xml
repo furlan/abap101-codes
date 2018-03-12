@@ -10,7 +10,6 @@
    <FUNCTIONS>
     <item>
      <FUNCNAME>Z_DATE_SET_DAY</FUNCNAME>
-     <INCLUDE>LZDATE_APIU01</INCLUDE>
      <SHORT_TEXT>Define day</SHORT_TEXT>
      <IMPORT>
       <RSIMP>
