@@ -1,9 +1,10 @@
 *&---------------------------------------------------------------------*
-*& Report zrefactor_v3a
+*& Report zrelped_v3a
+*& Github: https://github.com/furlan/abap101-codes
 *&---------------------------------------------------------------------*
-*&
+*& Copied from zrelped_v3
 *&---------------------------------------------------------------------*
-REPORT zrefactor_v3a LINE-SIZE 90.
+REPORT zrelped_v3a LINE-SIZE 90.
 
 TYPES: BEGIN OF lty_product,
          id          TYPE zproducts-id,
@@ -87,6 +88,8 @@ CLASS purchase_order DEFINITION.
 
     METHODS get_items EXPORTING items_list TYPE items_table.
 
+    METHODS link_display_generator IMPORTING generator_obj TYPE REF TO output_generator.
+
   PRIVATE SECTION.
     DATA po_number TYPE zpoheader-ponum.
     DATA items_list TYPE items_table.
@@ -118,6 +121,7 @@ CLASS purchase_order IMPLEMENTATION.
           wa_product TYPE lty_product,
           vg_total   TYPE lty_product-unit_price.
     LOOP AT items_list INTO r_product.
+
       wa_product = r_product->get( ).
       vg_total = wa_product-unit_price * wa_product-quantity.
       ADD vg_total TO re_total.
@@ -128,6 +132,10 @@ CLASS purchase_order IMPLEMENTATION.
     items_list = me->items_list.
   ENDMETHOD.
 
+  METHOD link_display_generator.
+    me->display_generator = generator_obj.
+  ENDMETHOD.
+
 ENDCLASS.
 
 CLASS test_purchase_order DEFINITION FOR TESTING RISK LEVEL HARMLESS.
@@ -135,7 +143,8 @@ CLASS test_purchase_order DEFINITION FOR TESTING RISK LEVEL HARMLESS.
     DATA test_purchase_order TYPE REF TO purchase_order.
     METHODS setup.
     METHODS return_total_po FOR TESTING.
-    METHODS should_not_have_price_zeroless FOR TESTING.
+    METHODS add_valid_product FOR TESTING.
+    METHODS should_not_have_price_zeroes FOR TESTING.
 ENDCLASS.
 
 CLASS test_purchase_order IMPLEMENTATION.
@@ -183,7 +192,7 @@ CLASS test_purchase_order IMPLEMENTATION.
 
   ENDMETHOD.
 
-  METHOD should_not_have_price_zeroless.
+  METHOD add_valid_product.
     DATA product_data TYPE lty_product.
     DATA test_product TYPE REF TO product.
     DATA test_exception TYPE REF TO cx_static_check.
@@ -198,10 +207,33 @@ CLASS test_purchase_order IMPLEMENTATION.
         imc_product = product_data.
     TRY.
         me->test_purchase_order->add_item( test_product ).
-      CATCH zcx_price_zeroless INTO test_exception.
+      CATCH zcx_price_zeroless.
+        EXIT.
     ENDTRY.
 
-    cl_abap_unit_assert=>assert_bound( act = test_exception ).
+    cl_abap_unit_assert=>fail( ).
+
+  ENDMETHOD.
+
+  METHOD should_not_have_price_zeroes.
+    DATA product_data TYPE lty_product.
+    DATA test_product TYPE REF TO product.
+    DATA test_exception TYPE REF TO cx_static_check.
+
+    product_data-id = '025'.
+    product_data-description = 'Cellphone 3000'.
+    product_data-quantity = 3.
+    product_data-unit_price = 0.
+
+    CREATE OBJECT test_product
+      EXPORTING
+        imc_product = product_data.
+    TRY.
+        me->test_purchase_order->add_item( test_product ).
+      CATCH zcx_price_zeroless.
+    ENDTRY.
+
+    cl_abap_unit_assert=>assert_bound( act = test_product ).
 
   ENDMETHOD.
 ENDCLASS.
@@ -211,17 +243,19 @@ INTERFACE data_loader.
                     RAISING   zcx_po_not_exists.
 ENDINTERFACE.
 
-CLASS products_loader_db DEFINITION.
+CLASS product_loader_db DEFINITION.
   PUBLIC SECTION.
     INTERFACES data_loader.
 ENDCLASS.
 
-CLASS products_loader_db IMPLEMENTATION.
+CLASS product_loader_db IMPLEMENTATION.
   METHOD data_loader~load_data.
     DATA products_data TYPE TABLE OF lty_product.
+
     FIELD-SYMBOLS <product_data> TYPE lty_product.
 
     DATA(po_number) = load_po->get_po_number( ).
+
 
     SELECT zpoitems~product_id
            zproducts~description
@@ -243,6 +277,7 @@ CLASS products_loader_db IMPLEMENTATION.
 
   ENDMETHOD.
 ENDCLASS.
+
 
 INTERFACE output_generator.
   METHODS generate IMPORTING po_object TYPE REF TO purchase_order.
@@ -279,17 +314,20 @@ CLASS report_list IMPLEMENTATION.
       ENDAT.
 
       wa_product = r_product->get( ).
+      vg_total = wa_product-unit_price * wa_product-quantity.
 
       WRITE: /1  wa_product-id,
               5  wa_product-description,
               30 wa_product-quantity,
               60 wa_product-unit_price,
-              80 r_product->get_value( ).
+              80 vg_total.
+
+      ADD vg_total TO vg_total_p.
 
       AT LAST.
         ULINE.
         FORMAT COLOR 7.
-        WRITE: / 'Total of Purchase Order --> ', po_object->get_po_total( ).
+        WRITE: / 'Total of Purchase Order --> ', vg_total_p.
       ENDAT.
 
     ENDLOOP.
@@ -305,12 +343,12 @@ START-OF-SELECTION.
   CREATE OBJECT r_pur_ord EXPORTING ponum = '00001'.
 
   DATA db_po_loader TYPE REF TO data_loader.
-  db_po_loader = NEW products_loader_db(  ).
+  db_po_loader = NEW product_loader_db( ).
 
   TRY.
       db_po_loader->load_data( r_pur_ord ).
     CATCH zcx_po_not_exists.
-      MESSAGE 'PO does not exist.' TYPE 'E'.
+      MESSAGE 'PO doeas not exist' TYPE 'E'.
   ENDTRY.
 
   DATA out_display TYPE REF TO output_generator.

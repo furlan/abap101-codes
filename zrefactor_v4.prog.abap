@@ -287,7 +287,7 @@ CLASS report_alv IMPLEMENTATION.
 
     LOOP AT items_list INTO DATA(r_product).
       DATA(product_data) = r_product->get( ).
-      output_item = product_data.
+      MOVE-CORRESPONDING product_data to output_item.
       output_item-item_value = r_product->get_value( ).
       APPEND output_item TO output_tab.
     ENDLOOP.
