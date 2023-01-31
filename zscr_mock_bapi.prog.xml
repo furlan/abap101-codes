@@ -4,8 +4,6 @@
   <asx:values>
    <PROGDIR>
     <NAME>ZSCR_MOCK_BAPI</NAME>
-    <STATE>A</STATE>
-    <VARCL>X</VARCL>
     <DBAPL>S</DBAPL>
     <SUBC>1</SUBC>
     <FIXPT>X</FIXPT>

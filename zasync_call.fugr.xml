@@ -34,17 +34,14 @@
       <RSFDO>
        <PARAMETER>IM_WAIT</PARAMETER>
        <KIND>P</KIND>
-       <INDEX> 001</INDEX>
       </RSFDO>
       <RSFDO>
        <PARAMETER>IM_VALUE</PARAMETER>
        <KIND>P</KIND>
-       <INDEX> 002</INDEX>
       </RSFDO>
       <RSFDO>
        <PARAMETER>EX_RETURN</PARAMETER>
        <KIND>P</KIND>
-       <INDEX> 003</INDEX>
       </RSFDO>
      </DOCUMENTATION>
     </item>
